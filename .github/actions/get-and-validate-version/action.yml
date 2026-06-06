@@ -3,9 +3,8 @@ description: Extracts version and exact release notes from CHANGELOG.md, and che
 
 inputs:
   pr_title:
-    description: "Optional pull request title to use as release title"
-    required: false
-    default: ""
+    description: "Pull request title to use as release title"
+    required: true
 
 outputs:
   version_tag:
@@ -28,7 +27,6 @@ runs:
       id: extract-version
       shell: bash
       run: |
-        # 1. Get the very first '##' header from CHANGELOG.md (e.g., "## v0.1.0-prerelease.1")
         FULL_HEADER=$(grep -m 1 '^## ' CHANGELOG.md | sed 's/^## //')
         
         if [ -z "$FULL_HEADER" ]; then
@@ -36,9 +34,6 @@ runs:
           exit 1
         fi
         
-        # 2. Validate against the strict regex patterns required
-        # Pattern 1: vX.Y.Z (e.g., v1.2.3)
-        # Pattern 2: vX.Y.Z-prerelease.N (e.g., v0.1.0-prerelease.1)
         if [[ ! "$FULL_HEADER" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] && [[ ! "$FULL_HEADER" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-prerelease\.[0-9]+$ ]]; then
           echo "Error: Version '$FULL_HEADER' does not match the required format."
           echo "Expected 'vX.Y.Z' or 'vX.Y.Z-prerelease.N'"
@@ -48,7 +43,6 @@ runs:
         echo "version_tag=$FULL_HEADER" >> $GITHUB_OUTPUT
         echo "Valid version format detected: $FULL_HEADER"
         
-        # 3. Check if it is a prerelease
         if [[ "$FULL_HEADER" == *"-prerelease"* ]]; then
           echo "is_prerelease=true" >> $GITHUB_OUTPUT
           echo "This is flagged as a Prerelease."
@@ -57,10 +51,8 @@ runs:
           echo "This is flagged as a Full Production Release."
         fi
         
-        # 4. Extract only the text between the first '##' and the next '##' (or end of file)
         BODY=$(awk '/^## /{if (p) exit; p=1; next} p' CHANGELOG.md)
         
-        # Save the extracted text handling multiline block strings securely
         echo "changelog_body<<EOF" >> $GITHUB_OUTPUT
         echo "$BODY" >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
@@ -76,30 +68,8 @@ runs:
           echo "Success: $TAG is available and unique."
         fi
 
-    - name: Fetch PR Metadata
+    - name: Process PR Metadata Input
       id: pr-metadata
       shell: bash
-      env:
-        GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
-        PR_TITLE_INPUT: ${{ inputs.pr_title }}
       run: |
-        # Use the workflow input title if provided
-        TITLE="$PR_TITLE_INPUT"
-
-        # Otherwise pull the PR title from the commit context using the GitHub API
-        if [ -z "$TITLE" ]; then
-          PRS_JSON=$(gh api repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls)
-          TITLE=$(echo "$PRS_JSON" | jq -r '.[0].title // empty')
-        fi
-
-        # If running inside a PR context (not main push), fallback safely to event data
-        if [ -z "$TITLE" ] || [ "$TITLE" = "null" ]; then
-          TITLE="${{ github.event.pull_request.title }}"
-        fi
-
-        # If still empty, use the commit message as fallback
-        if [ -z "$TITLE" ] || [ "$TITLE" = "null" ]; then
-          TITLE=$(git log -1 --pretty=%B)
-        fi
-
-        echo "pr_title=$TITLE" >> $GITHUB_OUTPUT
+        echo "pr_title=${{ inputs.pr_title }}" >> $GITHUB_OUTPUT
