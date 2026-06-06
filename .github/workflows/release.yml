@@ -28,6 +28,7 @@ jobs:
       - name: Sync pyproject version from CHANGELOG
         id: sync-version
         shell: bash
+        working-directory: ${{ github.workspace }}
         run: |
           VERSION_TAG="${{ steps.changelog-env.outputs.version_tag }}"
           VERSION="${VERSION_TAG#v}"
@@ -37,7 +38,7 @@ jobs:
           from pathlib import Path
 
           version = """${VERSION}"""
-          path = Path("pyproject.toml")
+          path = Path(r"${{ github.workspace }}") / "pyproject.toml"
           text = path.read_text()
           new_text, count = re.subn(r'^(version\s*=\s*)".*"$', rf'\1"{version}"', text, flags=re.MULTILINE)
           if count != 1:
