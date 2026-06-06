@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 2026-06-06
 
+### Modified
+- forces use of `Automation_PAT`
+
 ### Fixes
 - fixes version interpolation
 

@@ -18,7 +18,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.AUTOMATION_PAT || github.token }}
+          token: ${{ secrets.AUTOMATION_PAT }}
           persist-credentials: true
 
       - name: Extract and Validate Version
@@ -68,7 +68,7 @@ jobs:
         if: steps.has-diff.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v5
         with:
-          token: ${{ secrets.AUTOMATION_PAT || github.token }}
+          token: ${{ secrets.AUTOMATION_PAT }}
           commit-message: "chore: sync pyproject version to ${{ steps.changelog-env.outputs.version_tag }} [skip ci]"
           title: "chore: sync pyproject version to ${{ steps.changelog-env.outputs.version_tag }}"
           body: "Automatically sync pyproject.toml version with CHANGELOG.md."
@@ -82,7 +82,7 @@ jobs:
         if: steps.has-diff.outputs.changed == 'true' && steps.create-pr.outputs.pull-request-number != ''
         uses: peter-evans/enable-pull-request-automerge@v2
         with:
-          token: ${{ secrets.AUTOMATION_PAT || github.token }}
+          token: ${{ secrets.AUTOMATION_PAT }}
           pull-request-number: ${{ steps.create-pr.outputs.pull-request-number }}
           merge-method: squash
 
