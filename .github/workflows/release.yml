@@ -38,7 +38,7 @@ jobs:
           from pathlib import Path
 
           version = """${VERSION}"""
-          path = Path(r"${{ github.workspace }}") / "pyproject.toml"
+          path = Path("pyproject.toml")
           text = path.read_text()
           new_text, count = re.subn(r'^(version\s*=\s*)".*"$', rf'\1"{version}"', text, flags=re.MULTILINE)
           if count != 1:
