@@ -21,6 +21,10 @@ jobs:
           token: ${{ secrets.AUTOMATION_PAT }}
           persist-credentials: true
 
+      - name: Install GitHub CLI
+        run: |
+          which gh || sudo apt-get install -y gh
+
       - name: Extract and Validate Version
         id: changelog-env
         uses: ./.github/actions/get-and-validate-version
@@ -32,9 +36,6 @@ jobs:
         run: |
           VERSION_TAG="${{ steps.changelog-env.outputs.version_tag }}"
           VERSION="${VERSION_TAG#v}"
-
-          pwd
-          ls -la
 
           python - <<PY
           import re
@@ -66,30 +67,77 @@ jobs:
       - name: Create pull request for version sync
         id: create-pr
         if: steps.has-diff.outputs.changed == 'true'
-        uses: peter-evans/create-pull-request@v5
-        with:
-          token: ${{ secrets.AUTOMATION_PAT }}
-          commit-message: "chore: sync pyproject version to ${{ steps.changelog-env.outputs.version_tag }} [skip ci]"
-          title: "chore: sync pyproject version to ${{ steps.changelog-env.outputs.version_tag }}"
-          body: "Automatically sync pyproject.toml version with CHANGELOG.md."
-          branch: "release-sync-${{ steps.changelog-env.outputs.version_tag }}"
-          base: main
-          delete-branch: true
-          author: "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
-          committer: "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.AUTOMATION_PAT }}
+        run: |
+          VERSION_TAG="${{ steps.changelog-env.outputs.version_tag }}"
+          VERSION="${VERSION_TAG#v}"
+          BRANCH="release-sync-${VERSION}"
+
+          git checkout -b "$BRANCH"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pyproject.toml
+          git commit -m "chore: sync pyproject version to ${VERSION} [skip ci]"
+          git push --set-upstream origin "$BRANCH"
+
+          PR_NUMBER=$(gh pr create \
+            --title "chore: sync pyproject version to ${VERSION_TAG}" \
+            --body "Automatically sync pyproject.toml version with CHANGELOG.md." \
+            --base main \
+            --head "$BRANCH" \
+            --repo ${{ github.repository }} \
+            --json number \
+            -q .number)
+
+          echo "pull_request_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+
+      - name: Dispatch Validate PR Changelog
+        if: steps.has-diff.outputs.changed == 'true' && steps.create-pr.outputs.pull-request-number != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.AUTOMATION_PAT }}
+        run: |
+          gh workflow run check-changlog-changed.yml \
+            --ref main \
+            -f pr_number=${{ steps.create-pr.outputs.pull-request-number }} \
+            --repo ${{ github.repository }}
 
       - name: Enable automerge on PR
         if: steps.has-diff.outputs.changed == 'true' && steps.create-pr.outputs.pull-request-number != ''
-        uses: peter-evans/enable-pull-request-automerge@v2
-        with:
-          token: ${{ secrets.AUTOMATION_PAT }}
-          pull-request-number: ${{ steps.create-pr.outputs.pull-request-number }}
-          merge-method: squash
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.AUTOMATION_PAT }}
+        run: |
+          gh pr merge ${{ steps.create-pr.outputs.pull-request-number }} \
+            --auto \
+            --squash \
+            --repo ${{ github.repository }}
+
+      - name: Create Git Tag
+        shell: bash
+        run: |
+          git tag ${{ steps.changelog-env.outputs.version_tag }}
+          git push origin ${{ steps.changelog-env.outputs.version_tag }}
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.changelog-env.outputs.version_tag }}
-          name: ${{ steps.changelog-env.outputs.pr_title }}
-          body: ${{ steps.changelog-env.outputs.changelog_body }}
-          prerelease: ${{ steps.changelog-env.outputs.is_prerelease == 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.AUTOMATION_PAT }}
+        run: |
+          gh release create ${{ steps.changelog-env.outputs.version_tag }} \
+            --title "${{ steps.changelog-env.outputs.version_tag }}" \
+            --notes "${{ steps.changelog-env.outputs.changelog_body }}" \
+            ${{ steps.changelog-env.outputs.is_prerelease == 'true' && '--prerelease' || '' }} \
+            --repo ${{ github.repository }}
+
+      - name: Dispatch Validate PR Changelog
+        if: steps.has-diff.outputs.changed == 'true' && steps.create-pr.outputs.pull-request-number != ''
+        shell: basha
+        env:
+          GH_TOKEN: ${{ secrets.AUTOMATION_PAT }}
+        run: |
+          gh workflow run check-changlog-changed.yml \
+            --ref "release-sync-${{ steps.changelog-env.outputs.version_tag }}" \
+            --repo ${{ github.repository }}
