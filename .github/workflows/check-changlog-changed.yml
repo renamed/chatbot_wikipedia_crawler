@@ -7,6 +7,7 @@ on:
 
 jobs:
   validate:
+    name: Validate PR Changelog
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -30,3 +31,5 @@ jobs:
 
       - name: Extract and Validate Version
         uses: ./.github/actions/get-and-validate-version
+        with:
+          pr_title: ${{ github.event.pull_request.title }}

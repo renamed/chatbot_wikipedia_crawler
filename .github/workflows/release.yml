@@ -21,6 +21,8 @@ jobs:
       - name: Extract and Validate Version
         id: changelog-env
         uses: ./.github/actions/get-and-validate-version
+        with:
+          pr_title: ${{ github.event.pull_request.title }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
