@@ -33,6 +33,9 @@ jobs:
           VERSION_TAG="${{ steps.changelog-env.outputs.version_tag }}"
           VERSION="${VERSION_TAG#v}"
 
+          pwd
+          ls -la
+
           python - <<'PY'
           import re
           from pathlib import Path
