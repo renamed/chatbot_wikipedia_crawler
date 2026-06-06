@@ -1,6 +1,12 @@
 name: Get and Validate Changelog Version
 description: Extracts version and exact release notes from CHANGELOG.md, and checks for prerelease status.
 
+inputs:
+  pr_title:
+    description: "Optional pull request title to use as release title"
+    required: false
+    default: ""
+
 outputs:
   version_tag:
     description: "The extracted version tag (e.g., v0.1.0-prerelease.1)"
@@ -75,14 +81,25 @@ runs:
       shell: bash
       env:
         GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
+        PR_TITLE_INPUT: ${{ inputs.pr_title }}
       run: |
-        # Pulls the PR title from the commit context
-        PR_INFO=$(gh pr list --commit ${{ github.sha }} --state merged --json title --jq '.[0]')
-        TITLE=$(echo "$PR_INFO" | jq -r '.title')
-        
+        # Use the workflow input title if provided
+        TITLE="$PR_TITLE_INPUT"
+
+        # Otherwise pull the PR title from the commit context using the GitHub API
+        if [ -z "$TITLE" ]; then
+          PRS_JSON=$(gh api repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls)
+          TITLE=$(echo "$PRS_JSON" | jq -r '.[0].title // empty')
+        fi
+
         # If running inside a PR context (not main push), fallback safely to event data
         if [ -z "$TITLE" ] || [ "$TITLE" = "null" ]; then
           TITLE="${{ github.event.pull_request.title }}"
         fi
-        
+
+        # If still empty, use the commit message as fallback
+        if [ -z "$TITLE" ] || [ "$TITLE" = "null" ]; then
+          TITLE=$(git log -1 --pretty=%B)
+        fi
+
         echo "pr_title=$TITLE" >> $GITHUB_OUTPUT
