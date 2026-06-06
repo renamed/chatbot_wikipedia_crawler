@@ -1,0 +1,31 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract and Validate Version
+        id: changelog-env
+        uses: ./.github/actions/get-and-validate-version
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.changelog-env.outputs.version_tag }}
+          name: ${{ steps.changelog-env.outputs.pr_title }}
+          body: ${{ steps.changelog-env.outputs.changelog_body }}
+          prerelease: ${{ steps.changelog-env.outputs.is_prerelease == 'true' }}

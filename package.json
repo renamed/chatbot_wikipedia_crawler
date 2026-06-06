@@ -1,0 +1,14 @@
+{
+  "name": "chatbot-wikipedia-crawler",
+  "version": "0.0.0",
+  "description": "Chatbot wikipedia crawler reads from Wikipedia downloaded file and ingest it in pgVector database (postgres)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/chatbot_wikipedia_crawler.git"
+  },
+  "devDependencies": {
+    "semantic-release": "^21.1.0",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1"
+  }
+}

@@ -1,0 +1,88 @@
+name: Get and Validate Changelog Version
+description: Extracts version and exact release notes from CHANGELOG.md, and checks for prerelease status.
+
+outputs:
+  version_tag:
+    description: "The extracted version tag (e.g., v0.1.0-prerelease.1)"
+    value: ${{ steps.extract-version.outputs.version_tag }}
+  is_prerelease:
+    description: "True if the version is a prerelease"
+    value: ${{ steps.extract-version.outputs.is_prerelease }}
+  changelog_body:
+    description: "The release notes extracted from CHANGELOG.md"
+    value: ${{ steps.extract-version.outputs.changelog_body }}
+  pr_title:
+    description: "The title of the PR"
+    value: ${{ steps.pr-metadata.outputs.pr_title }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Extract and Validate Changelog Data
+      id: extract-version
+      shell: bash
+      run: |
+        # 1. Get the very first '##' header from CHANGELOG.md (e.g., "## v0.1.0-prerelease.1")
+        FULL_HEADER=$(grep -m 1 '^## ' CHANGELOG.md | sed 's/^## //')
+        
+        if [ -z "$FULL_HEADER" ]; then
+          echo "Error: No version header (##) found in CHANGELOG.md."
+          exit 1
+        fi
+        
+        # 2. Validate against the strict regex patterns required
+        # Pattern 1: vX.Y.Z (e.g., v1.2.3)
+        # Pattern 2: vX.Y.Z-prerelease.N (e.g., v0.1.0-prerelease.1)
+        if [[ ! "$FULL_HEADER" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] && [[ ! "$FULL_HEADER" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-prerelease\.[0-9]+$ ]]; then
+          echo "Error: Version '$FULL_HEADER' does not match the required format."
+          echo "Expected 'vX.Y.Z' or 'vX.Y.Z-prerelease.N'"
+          exit 1
+        fi
+        
+        echo "version_tag=$FULL_HEADER" >> $GITHUB_OUTPUT
+        echo "Valid version format detected: $FULL_HEADER"
+        
+        # 3. Check if it is a prerelease
+        if [[ "$FULL_HEADER" == *"-prerelease"* ]]; then
+          echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          echo "This is flagged as a Prerelease."
+        else
+          echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          echo "This is flagged as a Full Production Release."
+        fi
+        
+        # 4. Extract only the text between the first '##' and the next '##' (or end of file)
+        BODY=$(awk '/^## /{if (p) exit; p=1; next} p' CHANGELOG.md)
+        
+        # Save the extracted text handling multiline block strings securely
+        echo "changelog_body<<EOF" >> $GITHUB_OUTPUT
+        echo "$BODY" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: Verify tag uniqueness on GitHub
+      shell: bash
+      run: |
+        TAG="${{ steps.extract-version.outputs.version_tag }}"
+        if gh release view "$TAG" >/dev/null 2>&1; then
+          echo "Error: The release/tag $TAG already exists on GitHub."
+          exit 1
+        else
+          echo "Success: $TAG is available and unique."
+        fi
+
+    - name: Fetch PR Metadata
+      id: pr-metadata
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
+      run: |
+        # Pulls the PR title from the commit context
+        PR_INFO=$(gh pr list --commit ${{ github.sha }} --state merged --json title --jq '.[0]')
+        TITLE=$(echo "$PR_INFO" | jq -r '.title')
+        
+        # If running inside a PR context (not main push), fallback safely to event data
+        if [ -z "$TITLE" ] || [ "$TITLE" = "null" ]; then
+          TITLE="${{ github.event.pull_request.title }}"
+        fi
+        
+        echo "pr_title=$TITLE" >> $GITHUB_OUTPUT

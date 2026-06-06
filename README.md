@@ -1,0 +1,1 @@
+Chatbot wikipedia crawler reads from Wikipedia downloaded file and injest it in pgVector database (postgres).
