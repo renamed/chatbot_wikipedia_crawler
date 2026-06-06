@@ -4,6 +4,9 @@ on:
   pull_request:
     branches:
       - main
+  pull_request_target:
+    branches:
+      - main
 
 jobs:
   validate:
@@ -17,9 +20,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
-      # Step 1: Check if the PR was opened by the automation branch prefix
       - name: Check for Automation Branch Bypass
         id: branch-check
         run: |
@@ -31,13 +34,13 @@ jobs:
             echo "bypass=false" >> $GITHUB_OUTPUT
           fi
 
-      # Step 2: Check if pyproject.toml is the only file modified (if not already bypassed)
       - name: Check for Exclusive Pyproject Change Bypass
         id: file-diff-check
         if: steps.branch-check.outputs.bypass != 'true'
         run: |
-          git fetch origin ${{ github.base_ref }}
-          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          BASE_REF="${{ github.base_ref }}"
+          git fetch origin "$BASE_REF"
+          CHANGED_FILES=$(git diff --name-only origin/$BASE_REF...HEAD)
           TOTAL_CHANGES=$(echo "$CHANGED_FILES" | grep -v '^\s*$' | wc -l)
           
           if [ "$TOTAL_CHANGES" -eq 1 ] && [ "$CHANGED_FILES" = "pyproject.toml" ]; then
@@ -48,12 +51,12 @@ jobs:
             echo "bypass=false" >> $GITHUB_OUTPUT
           fi
 
-      # Step 3: Enforce CHANGELOG.md modification for standard PRs
       - name: Enforce Changelog Update
         if: steps.branch-check.outputs.bypass != 'true' && steps.file-diff-check.outputs.bypass != 'true'
         run: |
-          git fetch origin ${{ github.base_ref }}
-          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | tr '\n' ' ')
+          BASE_REF="${{ github.base_ref }}"
+          git fetch origin "$BASE_REF"
+          CHANGED_FILES=$(git diff --name-only origin/$BASE_REF...HEAD | tr '\n' ' ')
           
           if [[ ! " $CHANGED_FILES " =~ " CHANGELOG.md " ]]; then
             echo "Error: CHANGELOG.md has not been modified in this PR."
@@ -61,7 +64,6 @@ jobs:
           fi
           echo "Success: CHANGELOG.md modification verified."
 
-      # Step 4: Run your composite action only if it's a standard PR
       - name: Extract and Validate Version
         if: steps.branch-check.outputs.bypass != 'true' && steps.file-diff-check.outputs.bypass != 'true'
         uses: ./.github/actions/get-and-validate-version
