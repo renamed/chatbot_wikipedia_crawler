@@ -22,12 +22,12 @@ jobs:
         id: changelog-env
         uses: ./.github/actions/get-and-validate-version
         with:
-          pr_title: ${{ github.event.pull_request.title }}
+          pr_title: ${{ steps.changelog-env.outputs.version_tag }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.changelog-env.outputs.version_tag }}
-          name: ${{ steps.changelog-env.outputs.pr_title }}
+          name: ${{ steps.changelog-env.outputs.version_tag }}
           body: ${{ steps.changelog-env.outputs.changelog_body }}
           prerelease: ${{ steps.changelog-env.outputs.is_prerelease == 'true' }}
