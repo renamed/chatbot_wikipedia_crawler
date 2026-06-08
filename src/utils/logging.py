@@ -28,7 +28,7 @@ def setup_logging() -> logging.Logger:
     # Console Handler
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(log_format)
-    console_handler.setLevel(logging.WARNING)
+    console_handler.setLevel(logging.INFO)
     logger.addHandler(console_handler)
 
     # File Handler
@@ -40,9 +40,11 @@ def setup_logging() -> logging.Logger:
 
     buffered_handler = MemoryHandler(
         capacity=100,
-        flushLevel=logging.WARNING,
+        flushLevel=logging.INFO,
         target=file_handler
     )
+    buffered_handler.setLevel(logging.INFO)
+    file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(log_format)
     logger.addHandler(buffered_handler)
 

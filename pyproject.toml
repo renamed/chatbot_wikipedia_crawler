@@ -10,7 +10,7 @@ dependencies = [
     "psycopg[binary]==3.3.4",
     "pgvector==0.4.2",
 
-    "torch @ https://download.pytorch.org/whl/cu126/torch-2.12.0%2Bcu126-cp314-cp314-win_amd64.whl",
+    "torch @ https://download.pytorch.org/whl/cu126/torch-2.12.0%2Bcu126-cp314-cp314-win_amd64.whl"
 ]
 
 [tool.ruff]
